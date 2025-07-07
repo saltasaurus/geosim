@@ -15,8 +15,8 @@ func _ready():
 	await get_tree().create_timer(0.1).timeout
 	
 	print("\n=== Starting Diffusion Test ===")
-	#thermal_column.run_diffusion_test(50, TIME_STEP)  # 50 days, 1 day per step
-	thermal_column.run_radioactive_heating_test(50, TIME_STEP)
+	# 200 steps, 1000 year steps
+	thermal_column.run_radioactive_heating_test(200, TIME_STEP)
 
 func _input(event):
 	if event.is_action_pressed("ui_accept"):  # Spacebar
