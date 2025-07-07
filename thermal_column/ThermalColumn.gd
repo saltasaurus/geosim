@@ -10,6 +10,7 @@ var surface_temp: float = 15.0    # °C
 var bottom_temp: float = 2000.0   # °C
 var layer_thickness: float = 1000.0  # meters (1km layers)
 var total_depth: float = 100000.0    # meters (100km)
+var base_viscosity: Array[float] = [1e23, 1e22, 1e20]  # NEW: Pa·s for granite, basalt, mantle
 
 # Material properties (indexed by material ID)
 var thermal_conductivity: Array[float] = [3.0, 2.0, 4.0]  # W/(m·K) for materials 0,1,2
@@ -23,6 +24,7 @@ var actual_density: PackedFloat32Array  # Current density including thermal expa
 var reference_density: PackedFloat32Array  # What density should be at each depth (hydrostatic)
 var buoyancy_force: PackedFloat32Array  # Buoyancy force per unit volume (N/m³)
 var reference_temperature: float = 0.0  # °C - reference temp for density calculations
+var vertical_velocity: PackedFloat32Array  # NEW: Vertical velocity (m/s)
 
 # Physical constants
 var GRAVITY: float = 9.81  # m/s²
@@ -40,6 +42,7 @@ func initialize_column():
 	actual_density.resize(num_layers)
 	reference_density.resize(num_layers)
 	buoyancy_force.resize(num_layers)
+	vertical_velocity.resize(num_layers)
 	
 	for i in range(num_layers):
 		depth_nodes[i] = i * layer_thickness
@@ -51,6 +54,7 @@ func initialize_column():
 	update_densities()
 	calculate_reference_densities()
 	calculate_buoyancy_forces()
+	calculate_velocities()
 	
 	print("Initialized ", num_layers, " layers from 0 to ", total_depth/1000, "km")
 	print("Surface temp: ", temperatures[0], "°C, Bottom temp: ", temperatures[temperatures.size()-1], "°C")
@@ -80,6 +84,18 @@ func calculate_buoyancy_forces():
 	# Calculate buoyancy force: F = (ρ_ref - ρ_actual) × g
 	for i in range(buoyancy_force.size()):
 		buoyancy_force[i] = (reference_density[i] - actual_density[i]) * GRAVITY
+		
+func calculate_velocities():
+	for i in range(vertical_velocity.size()):
+		var mat_id = materials[i]
+		var temp = temperatures[i]
+
+		# Hot material flows easier (lower viscosity)
+		var temp_factor = exp(-temp / 1000.0)  # Exponential temperature dependence
+		var effective_viscosity = base_viscosity[mat_id] * temp_factor
+
+		# Stokes flow: velocity = force / viscosity
+		vertical_velocity[i] = buoyancy_force[i] / effective_viscosity
 
 func get_density_info():
 	# Debug function to show density changes
@@ -95,10 +111,12 @@ func create_realistic_earth_test():
 	# Standard Earth structure - continental crust over mantle
 	for i in range(materials.size()):
 		var depth = depth_nodes[i]
-		if depth <= 40000:  # 0-40km: Continental crust
+		if depth < 40000:  # 0-40km: Continental crust
 			materials[i] = 0  # Granite
 		else:               # 40km+: Upper mantle
 			materials[i] = 2  # Peridotite (mantle rock)
+			
+	print(materials[20], materials[40], )
 	
 	print("\nRealistic Earth structure:")
 	print("0-40km: Continental crust (granite) - high radioactive heating")
@@ -113,6 +131,13 @@ func get_buoyancy_info():
 	print("40km (boundary): ", "%.1f" % buoyancy_force[40], " N/m³")
 	print("60km (mantle): ", "%.1f" % buoyancy_force[60], " N/m³")
 	print("80km (mantle): ", "%.1f" % buoyancy_force[80], " N/m³")
+	
+func get_velocity_info():
+	print("\nVelocity Analysis:")
+	# Convert m/s values to geological mm/year for readability
+	for i in range(5):
+		var layer: int = i * 20
+		print(layer, " km velocity: ", vertical_velocity[layer], " m/s = ", vertical_velocity[layer] * 31557600000, " mm/year")
 
 func update_temperatures(dt: float):
 	var new_temps = temperatures.duplicate()
@@ -140,6 +165,7 @@ func update_temperatures(dt: float):
 	# Update densities after temperature changes
 	update_densities()
 	calculate_buoyancy_forces()
+	calculate_velocities()
 	
 	## Debug output for radioactive heating effects
 	#if temperatures[25] > 530 or temperatures[50] > 1020 or temperatures[75] > 1520:  # Above expected equilibrium
@@ -170,3 +196,6 @@ func run_radioactive_heating_test(num_steps: int = 200, dt: float = 86400.0 * 36
 	
 	# Show buoyancy forces
 	get_buoyancy_info()
+	
+	# Show velocities
+	get_velocity_info()
