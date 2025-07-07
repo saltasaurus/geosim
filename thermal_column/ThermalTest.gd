@@ -17,7 +17,7 @@ func _ready():
 	
 	# Create an auto-run timer
 	timer = Timer.new()
-	timer.wait_time = 0.1
+	timer.wait_time = 0.01
 	timer.timeout.connect(_on_timer_timeout)
 	add_child(timer)
 	
@@ -44,16 +44,18 @@ func _on_timer_timeout():
 	step_count += 1
 	thermal_column.update_temperatures(TIME_STEP)
 	
-	if step_count % 10 == 0:
-		print("\n=== Step ", step_count, " (", step_count * 1000, " years) ===")
-		print("\n--- Stats ---")
-		for i in range(6):
-			print("Temp: %.1f" % thermal_column.temperatures[i*20], "| Velocity: %.2f" % thermal_column.vertical_velocity[i*20])
-			
+	#if step_count % 10 == 0:
+		#print("\n=== Step ", step_count, " (", step_count * 1000, " years) ===")
+		#print("\n--- Stats ---")
+		#for i in range(6):
+			#print("Temp: %.1f" % thermal_column.temperatures[i*20], "| Velocity: %.2f" % thermal_column.vertical_velocity[i*20])
+			#
 	if step_count % 100 == 0:
+		print("\n=== Step ", step_count, " (", step_count * 1000, " years) ===")
 		thermal_column.get_density_info()
 		thermal_column.get_buoyancy_info()
 		thermal_column.get_velocity_info()
+		thermal_column.get_advection_info()
 
 func _input(event):
 	if event.is_action_pressed("ui_accept"):  # Spacebar

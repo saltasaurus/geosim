@@ -25,9 +25,11 @@ var reference_density: PackedFloat32Array  # What density should be at each dept
 var buoyancy_force: PackedFloat32Array  # Buoyancy force per unit volume (N/m³)
 var reference_temperature: float = 0.0  # °C - reference temp for density calculations
 var vertical_velocity: PackedFloat32Array  # NEW: Vertical velocity (m/s)
+var material_displacement: PackedFloat32Array  # How far each layer has moved from original position
 
 # Physical constants
 var GRAVITY: float = 9.81  # m/s²
+var advection_enabled: bool = false # Enable/disable material movement
 
 func _ready():
 	initialize_column()
@@ -43,12 +45,14 @@ func initialize_column():
 	reference_density.resize(num_layers)
 	buoyancy_force.resize(num_layers)
 	vertical_velocity.resize(num_layers)
+	material_displacement.resize(num_layers)
 	
 	for i in range(num_layers):
 		depth_nodes[i] = i * layer_thickness
 		# Linear temperature profile for now
 		temperatures[i] = surface_temp + (bottom_temp - surface_temp) * (float(i) / (num_layers - 1))
 		materials[i] = 0  # Start with all granite for simplicity
+		material_displacement[i] = 0.0 # No initial displacement
 	
 	# Calculate initial densities and forces
 	update_densities()
@@ -96,7 +100,60 @@ func calculate_velocities():
 
 		# Stokes flow: velocity = force / viscosity
 		vertical_velocity[i] = buoyancy_force[i] / effective_viscosity
-
+		
+func advect_material(dt: float):
+	"""Move material based on velocity and update properties"""
+	
+	# Update displacements
+	for i in range(material_displacement.size()):
+		material_displacement[i] += vertical_velocity[i] * dt
+		
+	# Create new property array based on material movement
+	var new_temperatures = PackedFloat32Array()
+	var new_materials = PackedInt32Array()
+	new_temperatures.resize(temperatures.size())
+	new_materials.resize(materials.size())
+	
+	# For each point, find new material at location
+	for i in range(temperatures.size()):
+		var current_depth = depth_nodes[i]
+		
+		# Find which original layer's material is now at this depth
+		var source_layer = find_source_layer_at_depth(current_depth)
+		
+		# Copy properties from the source layer
+		if source_layer >= 0 and source_layer < temperatures.size():
+			new_temperatures[i] = temperatures[source_layer]
+			new_materials[i] = materials[source_layer]
+		else:
+			# Boundary handling
+			new_temperatures[i] = temperatures[i]
+			new_materials[i] = materials[i]
+			
+	# Update arrays with advected properties
+	temperatures = new_temperatures
+	materials = new_materials
+	
+func find_source_layer_at_depth(target_depth: float) -> int:
+	"""Find which original layer's material has moved to the target depth"""	
+		
+	var best_match: int = -1
+	var min_distance = 1e9
+	
+	for i in range(depth_nodes.size()):
+		# Calculate where this layer's material has moved
+		var original_depth = depth_nodes[i]
+		var current_material_depth = original_depth + material_displacement[i]
+		
+		# Find the closest match to our target depth
+		var distance = abs(current_material_depth - target_depth)
+		if distance < min_distance:
+			min_distance = distance
+			best_match = i
+		
+	
+	return best_match
+		
 func get_density_info():
 	# Debug function to show density changes
 	print("\nDensity Analysis:")
@@ -139,7 +196,34 @@ func get_velocity_info():
 		var layer: int = i * 20
 		print(layer, " km velocity: ", vertical_velocity[layer], " m/s = ", vertical_velocity[layer] * 31557600000, " mm/year")
 
+func enable_advection():
+	advection_enabled = true
+	print("\n=== ADVECTION ENABLED ===")
+	print("Material will now move based on buoyancy forces!")
+	print("Watch for temperature and material redistribution...")
+	
+func get_advection_info():
+	# Debug function to show material movement
+	print("\nAdvection Analysis:")
+	print("20km displacement: ", "%.2f" % material_displacement[20], " meters (", "%.2f" % (material_displacement[20]/1000), " km)")
+	print("40km displacement: ", "%.2f" % material_displacement[40], " meters (", "%.2f" % (material_displacement[40]/1000), " km)")
+	print("60km displacement: ", "%.2f" % material_displacement[60], " meters (", "%.2f" % (material_displacement[60]/1000), " km)")
+	print("80km displacement: ", "%.2f" % material_displacement[80], " meters (", "%.2f" % (material_displacement[80]/1000), " km)")
+
+	# Check for material boundary changes
+	var crust_layers = 0
+	var mantle_layers = 0
+	for i in range(40):  # First 40 layers should be crust
+		if materials[i] == 0: crust_layers += 1
+	for i in range(40, materials.size()):  # Remaining should be mantle
+		if materials[i] == 2: mantle_layers += 1
+
+	print("Crust layers in upper 40km: ", crust_layers, "/40")
+	print("Mantle layers in lower region: ", mantle_layers, "/", materials.size() - 40)
+
+
 func update_temperatures(dt: float):
+	"""Main function. Updates temperatures, which causes all other processes to begin"""
 	var new_temps = temperatures.duplicate()
 	
 	# Update interior layers (skip boundaries)
@@ -166,6 +250,9 @@ func update_temperatures(dt: float):
 	update_densities()
 	calculate_buoyancy_forces()
 	calculate_velocities()
+	
+	if advection_enabled:
+		advect_material(dt)
 	
 	## Debug output for radioactive heating effects
 	#if temperatures[25] > 530 or temperatures[50] > 1020 or temperatures[75] > 1520:  # Above expected equilibrium
