@@ -56,6 +56,7 @@ func _on_timer_timeout():
 		thermal_column.get_buoyancy_info()
 		thermal_column.get_velocity_info()
 		thermal_column.get_advection_info()
+		thermal_column.debug_advection_detailed()
 
 func _input(event):
 	if event.is_action_pressed("ui_accept"):  # Spacebar
