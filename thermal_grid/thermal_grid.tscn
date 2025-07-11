@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://bl362gr2l4o0f"]
+
+[ext_resource type="Script" uid="uid://b4ahpxbbv8jfs" path="res://thermal_grid/ThermalGrid.gd" id="1_1pc14"]
+
+[node name="ThermalGrid" type="Node2D"]
+script = ExtResource("1_1pc14")
