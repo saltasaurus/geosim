@@ -24,9 +24,18 @@ func _ready():
 	# Wait a moment for initialization, then run test
 	await get_tree().create_timer(0.1).timeout
 	
-	print("\n=== Starting Diffusion Test ===")
-	# 200 steps, 10000 year steps
-	thermal_column.run_radioactive_heating_test(200, TIME_STEP)
+	# In _ready(), replace the interface test with:
+	print("\n=== Testing Grid-Level Pressure Analysis ===")
+
+	# Let thermal grid analyze pressure differences
+	var thermal_grid = ThermalGrid.new()
+	add_child(thermal_grid)
+
+	# Wait for grid initialization
+	await get_tree().create_timer(0.2).timeout
+
+	# Test the pressure difference calculations
+	thermal_grid.update_thermal_system()
 	
 func start_auto_evolution():
 	auto_running = true

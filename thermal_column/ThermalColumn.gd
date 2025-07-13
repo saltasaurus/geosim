@@ -366,7 +366,47 @@ func update_temperatures(dt: float):
 	
 	if advection_enabled:
 		advect_material(dt)
+
+func get_lateral_pressure(depth_index: int) -> float:
+	"""Get pressure at specific depth for neighbor calculations"""
 	
-	## Debug output for radioactive heating effects
-	#if temperatures[25] > 530 or temperatures[50] > 1020 or temperatures[75] > 1520:  # Above expected equilibrium
-		#print("Radioactive heating - Layer 25: ", "%.1f" % temperatures[25], "°C, Layer 50: ", "%.1f" % temperatures[50], "°C, Layer 75: ", "%.1f" % temperatures[75], "°C")
+	# Calculate pressure from weight of overlying material
+	var pressure: float = 0.0
+	for i in range(depth_index + 1):
+		pressure += actual_density[i] * GRAVITY * layer_thickness
+		
+	return pressure
+	
+func receive_later_material_flux(
+	source_depth: int,
+	target_depth: int,
+	material_type: int,
+	mass_flux_kg_per_m2: float,
+	flux_temperature: float
+):
+	"""Receive material from a neighboring column"""
+	print("Column received flux: ", mass_flux_kg_per_m2, " kg/m2 of material ", material_type, " at ", flux_temperature, "C")
+	
+func send_material_flux_info() -> Dictionary:
+	"""Provide information needed for flux calculations"""
+	return {
+		"pressures": get_all_pressures(),
+		"temperatures": temperatures.duplicate(),
+		"materials": materials.duplicate(),
+		"densities": actual_density.duplicate()
+	}
+
+func get_all_pressures() -> PackedFloat32Array:
+	"""Calculate pressure at each depth
+	
+	Hydrostatic Pressure Field: P(z) = P₀ + Σ(ρᵢ × g × Δz)
+	"""
+	var pressures = PackedFloat32Array()
+	pressures.resize(depth_nodes.size())
+
+	pressures[0] = 0.0  # Surface pressure
+	for i in range(1, pressures.size()):
+		var layer_weight = actual_density[i-1] * GRAVITY * layer_thickness
+		pressures[i] = pressures[i-1] + layer_weight
+
+	return pressures
