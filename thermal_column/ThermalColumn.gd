@@ -410,3 +410,34 @@ func get_all_pressures() -> PackedFloat32Array:
 		pressures[i] = pressures[i-1] + layer_weight
 
 	return pressures
+
+func find_steep_density_gradients(threshold: float = 50.0) -> Array[Dictionary]:
+	"""Scan column for significant density boundaries
+	
+	threshold: kg/(m^3 * km)"""
+	var boundaries: Array[Dictionary] = []
+
+	for i in range(actual_density.size() - 1):
+		var density_change = abs(actual_density[i+1] - actual_density[i])
+		var depth_km = depth_nodes[i] / 1000.0
+		
+		if density_change > threshold:
+			var boundary_info = {
+				"depth_index": i,
+				"depth_km": depth_km,
+				"density_gradient": density_change / layer_thickness,  # kg/m³/m
+				"boundary_type": classify_boundary_type(i)
+			}
+			boundaries.append(boundary_info)
+	return boundaries
+
+func classify_boundary_type(depth_index: int) -> String:
+	"""Determine what type of boundary this is"""
+	var depth_km = depth_nodes[depth_index] / 1000.0
+	var material_above = materials[depth_index]
+	var material_below = materials[depth_index + 1] if depth_index + 1 < materials.size() else material_above
+
+	if material_above != material_below:
+		return "material_boundary"  # Pre-existing material change
+	else:
+		return "thermal_boundary"   # Temperature-driven density change

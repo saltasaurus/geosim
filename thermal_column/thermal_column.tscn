@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://clwng1bcv3kf"]
 
-[ext_resource type="Script" uid="uid://b1pbyabbiptmw" path="res://thermal_column/ThermalTest.gd" id="1_lyxih"]
+[ext_resource type="Script" uid="uid://b1pbyabbiptmw" path="res://ThermalTest.gd" id="1_0tyvx"]
 
 [node name="Node2D" type="Node2D"]
-script = ExtResource("1_lyxih")
+script = ExtResource("1_0tyvx")
